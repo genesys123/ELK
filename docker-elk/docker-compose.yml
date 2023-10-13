@@ -1,0 +1,74 @@
+version: '3.2'
+services:
+  book-api-service-1:
+    container_name: bookapi_container_1
+    build:
+      context: ../
+      dockerfile: Dockerfile.bookapi
+    restart: always
+    ports:
+      - 8080:8080
+    logging:
+      driver: gelf
+      options:
+        gelf-address: "udp://0.0.0.0:5000"
+        tag: "bookapi_app_1"
+    env_file:
+      - ../myapp1-variables.env
+    networks:
+      - elk
+
+  book-api-service-2:
+    container_name: bookapi_container_2
+    build:
+      context: ../
+      dockerfile: Dockerfile.bookapi
+    restart: always
+    ports:
+      - 8082:8082
+    logging:
+      driver: gelf
+      options:
+        gelf-address: "udp://0.0.0.0:5000"
+        tag: "bookapi_app_2"
+    env_file:
+      - ../myapp2-variables.env
+    networks:
+      - elk
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.2.0
+    ports:
+      - "9200:9200"
+    environment:
+      - "discovery.type=single-node"
+    volumes:
+      - ./elasticsearch/data:/usr/share/elasticsearch/data:rw              # Persistence data
+    networks:
+      - elk
+  logstash:
+    image: docker.elastic.co/logstash/logstash:7.2.0
+    ports:
+      - "25826:25826"
+      - "5044:5044"
+    volumes:
+      - ./logstash/pipeline:/usr/share/logstash/pipeline:ro                # Pipeline configuration
+    restart: on-failure
+    depends_on:
+      - elasticsearch
+    networks:
+      - elk
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.2.0
+    ports:
+      - "5601:5601"
+    restart: on-failure
+    depends_on:
+      - elasticsearch
+    networks:
+      - elk
+networks:
+  elk:
+    driver: bridge
+
+volumes:
+  elasticsearch:
